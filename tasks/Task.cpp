@@ -431,11 +431,9 @@ void Task::outputPortSamples(const base::Time &timestamp)
 {
     WMTKState statek = this->filter->mu();
 
+    /** Out port the last pose **/
+    this->pose_out = this->esam->getRbsPose(this->esam->currentPoseId());
     this->pose_out.time = timestamp;
-    this->pose_out.position = statek.pos;
-    this->pose_out.cov_position = this->filter->sigma().block<3,3>(0,0);
-    this->pose_out.orientation = statek.orient;
-    this->pose_out.cov_orientation = this->filter->sigma().block<3,3>(3,3);
     this->pose_out.velocity = statek.velo;
     this->pose_out.cov_velocity =  this->filter->sigma().block<3,3>(6,6);
     this->pose_out.angular_velocity = statek.angvelo;
@@ -447,6 +445,7 @@ void Task::outputPortSamples(const base::Time &timestamp)
         if (_output_debug.value())
         {
             this->info.time = timestamp;
+            this->info.pose_nodes_rbs = this->esam->getRbsPoses();
             _task_info_out.write(info);
         }
     }
