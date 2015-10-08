@@ -110,6 +110,7 @@ namespace sam {
         /***************************/
         /** Output port variables **/
         /***************************/
+
         base::samples::RigidBodyState pose_out;
 
         /** Current map in point cloud form **/
@@ -219,6 +220,11 @@ namespace sam {
         /**@brief Initialize the envire SAM
          */
         void initESAM(base::TransformWithCovariance &tf_cov);
+
+        /**@brief Check the uncertainty over the last segment
+         */
+        bool checkSegmentCov(const double &current_segment);
+
 
         /** @brief Port out the values
         */

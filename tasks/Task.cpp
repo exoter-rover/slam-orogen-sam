@@ -136,14 +136,21 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
     double current_segment = (this->last_state.orient.inverse()*(this->last_state.pos - this->filter->mu().pos)).norm();
 
     std::cout<<"CURRENT SEGMENT: "<<current_segment;
-    /** Set new nodes in envire SAM **/
+
+    /** Check the distance traveled **/
     if(current_segment > _distance_segment.value())
     {
         std::cout<<" IS BIGGER THAN "<<_distance_segment.value()<<"\n";
-        this->updateESAM();
 
-        if (this->esam->currentPoseId().compare("x20") == 0)
+        /** Only add a new node in case the covariance is bigger than the
+         * percentage error defined in the task property**/
+        if (this->checkSegmentCov(current_segment))
         {
+            /** Update accumulated distance **/
+            this->info.accumulated_distance += current_segment;
+
+            /** Update ESAM **/
+            this->updateESAM();
             std::cout<<"FACTOR-GRAPH!!!\n";
             this->esam->printFactorGraph("\nFACTOR GRAPH\n");
             std::cout<<"OPTIMIZE!!!\n";
@@ -215,6 +222,7 @@ bool Task::configureHook()
 
     /** Relative Frame to port out the samples **/
     pose_out.targetFrame = _world_frame.value();
+    this->info.accumulated_distance = 0.00;
 
     /***********************/
     /** Info and Warnings **/
@@ -273,10 +281,10 @@ void Task::initialization(Eigen::Affine3d &tf)
     /** Initial covariance matrix **/
     UKF::cov P0; /** Initial P(0) for the state **/
     P0.setZero();
-    MTK::setDiagonal (P0, &WMTKState::pos, 1e-06);
-    MTK::setDiagonal (P0, &WMTKState::orient, 1e-06);
-    MTK::setDiagonal (P0, &WMTKState::velo, 1e-10);
-    MTK::setDiagonal (P0, &WMTKState::angvelo, 1e-10);
+    MTK::setDiagonal (P0, &WMTKState::pos, 1e-10);
+    MTK::setDiagonal (P0, &WMTKState::orient, 1e-10);
+    MTK::setDiagonal (P0, &WMTKState::velo, 1e-12);
+    MTK::setDiagonal (P0, &WMTKState::angvelo, 1e-12);
 
     /** Initialization for UKF **/
     this->initUKF(statek_0, P0);
@@ -367,10 +375,10 @@ void Task::resetUKF(::base::Pose &current_delta_pose, ::base::Vector6d &cov_curr
 
     /** Reset covariance matrix **/
     UKF::cov P(UKF::cov::Zero());
-    MTK::setDiagonal (P, &WMTKState::pos, 1e-06);
-    MTK::setDiagonal (P, &WMTKState::orient, 1e-06);
-    MTK::setDiagonal (P, &WMTKState::velo, 1e-10);
-    MTK::setDiagonal (P, &WMTKState::angvelo, 1e-10);
+    MTK::setDiagonal (P, &WMTKState::pos, 1e-10);
+    MTK::setDiagonal (P, &WMTKState::orient, 1e-10);
+    MTK::setDiagonal (P, &WMTKState::velo, 1e-12);
+    MTK::setDiagonal (P, &WMTKState::angvelo, 1e-12);
 
     /** Remove the filter **/
     this->filter.reset();
@@ -399,6 +407,25 @@ void Task::initESAM(base::TransformWithCovariance &tf_cov)
     return;
 }
 
+bool Task::checkSegmentCov(const double &current_segment)
+{
+    Eigen::Matrix3d const &cov_segment_position(this->filter->sigma().block<3,3>(0,0));
+
+    /** Compute eigenvalues **/
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> ev(cov_segment_position);
+    Eigen::Vector3d e_val = ev.eigenvalues();
+    const double error = Eigen::Vector3d(e_val.array().sqrt()).norm();
+
+    std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_segment_position<<"\n";
+    std::cout<<"[SAM] CURRENT NORM ERROR: "<<error<<"\n";
+    std::cout<<"[SAM] TARGET NORM ERROR: "<<_error_per_distance_traveled.value() * current_segment<<"\n";
+    if (error > _error_per_distance_traveled.value() * current_segment)
+    {
+        return true;
+    }
+
+    return false;
+}
 
 void Task::outputPortSamples(const base::Time &timestamp)
 {

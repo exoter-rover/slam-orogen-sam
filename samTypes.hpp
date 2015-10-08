@@ -47,6 +47,7 @@ namespace sam {
     {
         base::Time time; //time-stamp
         base::Time predict_execution_time;
+        double accumulated_distance;
         std::vector< base::samples::RigidBodyState > pose_nodes_rbs; //Rbs with the orientation and position of the contact point
         std::vector< base::samples::RigidBodyState > landmark_nodes_rbs; //Rbs with the orientation and position of the contact point
         std::vector< base::samples::Pointcloud > point_clouds; //Rbs with the orientation and position of the contact point
