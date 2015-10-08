@@ -142,7 +142,7 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         std::cout<<" IS BIGGER THAN "<<_distance_segment.value()<<"\n";
         this->updateESAM();
 
-        if (this->esam->currentPoseId().compare("x2") == 0)
+        if (this->esam->currentPoseId().compare("x20") == 0)
         {
             std::cout<<"FACTOR-GRAPH!!!\n";
             this->esam->printFactorGraph("\nFACTOR GRAPH\n");
@@ -359,11 +359,7 @@ void Task::resetUKF(::base::Pose &current_delta_pose, ::base::Vector6d &cov_curr
     /** Compute the delta covariance since last time we reset the filter **/
     /** The covariance is reset every step, then tehre is not need to compute
      * the difference between last and current **/
-    ::base::Matrix3d cov_delta_position, cov_delta_orientation;
-    cov_delta_position = this->filter->sigma().block<3,3>(0,0) - this->last_state_cov.block<3,3>(0,0);// Delta position covariance
-    cov_delta_position = this->last_state.orient.inverse().toRotationMatrix() * cov_delta_position * this->last_state.orient.inverse().toRotationMatrix().transpose();// Delta covariance in last frame
-    cov_delta_orientation = this->filter->sigma().block<3,3>(3,3) - this->last_state_cov.block<3,3>(3,3);// Delta orientation covariance
-    cov_current_delta_pose << cov_delta_position.diagonal(), cov_delta_orientation.diagonal();
+    cov_current_delta_pose = this->filter->sigma().block<6,6>(0,0).diagonal();
 
     /** Update the last state **/
     this->last_state = this->filter->mu();
