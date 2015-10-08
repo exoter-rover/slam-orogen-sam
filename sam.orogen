@@ -4,8 +4,9 @@ name "sam"
 
 # If new data types need to be defined, they have to be put in a separate C++
 # header, and this header will be loaded here
-using_library "gtsam" # Localization library
+#using_library "gtsam" # Localization library
 using_library "envire_core" # Environment representation library
+using_library "envire_sam" # Environment representation with Smoothing and Mapping library
 
 # If new data types need to be defined, they have to be put in a separate C++
 # header, and this header will be loaded here
@@ -21,6 +22,19 @@ task_context "Task" do
     #**************************
     #***** Task Properties ****
     #**************************
+    property('localization_source_frame', '/std/string').
+        doc 'Frame of the localization (normally body frame)'+
+            'The localization target frame is taken from the world frame of the transformer.'
+
+    property('error_per_distance_traveled', 'double').
+        doc 'Unit error per distance traveled (0 - 1).'
+
+    property('distance_segment', 'double').
+        doc 'Minimum distance (in meters) to set a new node for the optimization.'
+
+    #*********************************
+    #***** Point Cloud Properties ****
+    #*********************************
     property('sensor_point_cloud_height', 'int').
 	doc 'PCL Point clouds needs to be organized. It will take this property to organize them.'
 
@@ -65,6 +79,9 @@ task_context "Task" do
 
     property('output_debug', 'bool', false).
         doc "Set to true in case you want to have filter debug information"
+
+    output_port('task_info_out', 'sam/Information').
+    	doc 'Task SAM information to port out'
 
     port_driven
 

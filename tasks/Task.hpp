@@ -32,18 +32,25 @@
 /** Envire **/
 #include <envire_core/all>
 
+/** SAM **/
+#include <envire_sam/ESAM.hpp>
+
 namespace sam {
 
+    /** MTK TYPES **/
     // We can't use types having a comma inside AutoConstruct macros :(
     typedef MTK::vect<3, double> vec3;
     typedef MTK::SO3<double> SO3;
 
-
     MTK_BUILD_MANIFOLD ( MTKState ,
     (( vec3, pos ))
     (( SO3, orient ))
-    (( vec3, vel ))
+    (( vec3, velo ))
+    (( vec3, angvelo ))
     );
+
+    typedef ukfom::mtkwrap<MTKState> WMTKState;
+    typedef ukfom::ukf<WMTKState> UKF;
 
     /*! \class Task 
      * \brief The task context provides and requires services. It uses an ExecutionEngine to perform its functions.
@@ -64,28 +71,52 @@ namespace sam {
 	friend class TaskBase;
 
     protected:
+        /******************************/
+        /*** Control Flow Variables ***/
+        /******************************/
+        bool initFilter;
+
         /**************************/
         /*** Property Variables ***/
         /**************************/
+        sam::BilateralFilterConfiguration bfilter_config; /** Bilateral filter Configuration **/
+        sam::OutlierRemovalFilterConfiguration outlierfilter_config; /** Outlier Filter Removal Configuration **/
 
         /******************************************/
         /*** General Internal Storage Variables ***/
         /******************************************/
 
-        envire::core::TransformGraph envire_graph; //! The environment in a graph structure
+        /** State of the filter **/
+        WMTKState last_state;
 
-        boost::shared_ptr< ukfom::ukf<MTKState> > pose_ukf; //! The pose prediction in a UT form
+        UKF::cov last_state_cov;
+
+        /** The pose prediction in an UT form **/
+        boost::shared_ptr<UKF> filter;
+
+        /** Envire Smoothing and Mapping **/
+        boost::shared_ptr<envire::sam::ESAM> esam;
+
+        /** Last pose stored on the esam **/
+        base::TransformWithCovariance last_esam_pose;
 
         /**************************/
         /** Input port variables **/
         /**************************/
 
+        /** Delta Pose estimation **/
+        ::base::samples::RigidBodyState delta_pose;
 
         /***************************/
         /** Output port variables **/
         /***************************/
         base::samples::RigidBodyState pose_out;
-        base::samples::Pointcloud point_cloud_map;
+
+        /** Current map in point cloud form **/
+        base::samples::Pointcloud base_point_cloud_map_out;
+
+        /** Debug filter info **/
+        sam::Information info;
 
     protected:
 
@@ -168,6 +199,31 @@ namespace sam {
          * before calling start() again.
          */
         void cleanupHook();
+
+        /**@brief initialization
+         */
+        void initialization(Eigen::Affine3d &tf);
+
+        /**@brief Initialize the UKF
+         */
+        void initUKF(WMTKState &statek, UKF::cov &statek_cov);
+
+        /**@brief Update
+         */
+        void updateESAM();
+
+        /**@brief Reset the UKF
+         */
+        void resetUKF(::base::Pose &current_delta_pose, ::base::Vector6d &cov_current_delta_pose);
+
+        /**@brief Initialize the envire SAM
+         */
+        void initESAM(base::TransformWithCovariance &tf_cov);
+
+        /** @brief Port out the values
+        */
+        void outputPortSamples(const base::Time &timestamp);
+
     };
 }
 
