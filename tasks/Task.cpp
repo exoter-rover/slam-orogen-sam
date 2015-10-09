@@ -151,10 +151,10 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
 
             /** Update ESAM **/
             this->updateESAM();
-            std::cout<<"FACTOR-GRAPH!!!\n";
-            this->esam->printFactorGraph("\nFACTOR GRAPH\n");
+            this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
             std::cout<<"OPTIMIZE!!!\n";
             this->esam->optimize();
+            std::cout<<"MARGINALS!!!\n";
             this->esam->printMarginals();
         }
     }
@@ -194,11 +194,16 @@ void Task::point_cloud_samplesTransformerCallback(const base::Time &ts, const ::
     /** Transform the point cloud in body frame (in case of needed) **/
     if (_sensor_frame.value().compare(_body_frame.value()) != 0)
     {
-        //::sam::transformPointCloud(base_point_cloud_in, tf);
+        envire::sam::transformPointCloud(base_point_cloud_in, tf);
     }
 
-    /** Convert to pcl point clouds **/
-
+    /** Push the point cloud in ESAM **/
+    Eigen::Affine3d delta_tf (this->filter->mu().orient);
+    delta_tf.translation() = this->filter->mu().pos;
+    this->esam->pushPointCloud(base_point_cloud_in,
+            static_cast<int>(_sensor_point_cloud_height.value()),
+            static_cast<int>(_sensor_point_cloud_width.value()),
+            delta_tf);
 }
 
 /// The following lines are template definitions for the various state machine
@@ -215,6 +220,9 @@ bool Task::configureHook()
     /***********************/
 
     this->initFilter = false;
+
+    this->bfilter_config = _bfilter_config.get();
+    this->outlier_config = _outlier_config.get();
 
     /** SAM Output port **/
     this->sam_pose_out.invalidate();
@@ -402,7 +410,8 @@ void Task::initESAM(base::TransformWithCovariance &tf_cov)
     /*********************************************/
 
     /** ESAM constructor set the prior factor **/
-    this->esam.reset(new envire::sam::ESAM(tf_cov, 'x', 'l'));
+    this->esam.reset(new envire::sam::ESAM(tf_cov, 'x', 'l',
+                this->bfilter_config, this->outlier_config));
 
     /** Set the initial pose value **/
     this->esam->addPoseValue(tf_cov);
