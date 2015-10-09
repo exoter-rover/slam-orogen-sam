@@ -15,33 +15,6 @@
 
 namespace sam {
 
-    enum OutlierFilterType
-    {
-        NONE,
-        STATISTICAL,
-        RADIUS
-    };
-
-    struct BilateralFilterConfiguration
-    {
-        bool filterOn;
-        float spatial_width; //size of the window bilateral filter
-        float range_sigma; // the standard deviation of the Gaussian for the intensity difference
-    };
-
-    struct OutlierRemovalFilterConfiguration
-    {
-        OutlierFilterType type;
-
-        //STATISTICAL: the number of nearest neighbors to use for mean distance estimation (nr_k)
-        //RADIUS: Get the radius of the sphere that will determine which points are neighbors (radiu).
-        float parameter_one;
-
-        //STATISTICAL: the standard deviation multiplier for the distance threshold calculation.(stddev_null)
-        //RADIUS: number of neighbors that need to be present in order to be classified as an inlier(min_pts)
-        float parameter_two;
-    };
-
     /** Output port type **/
     struct Information
     {
