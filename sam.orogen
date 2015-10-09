@@ -22,9 +22,13 @@ task_context "Task" do
     #**************************
     #***** Task Properties ****
     #**************************
-    property('localization_source_frame', '/std/string').
-        doc 'Frame of the localization (normally body frame)'+
-            'The localization target frame is taken from the world frame of the transformer.'
+    property('sam_localization_source_frame', '/std/string').
+        doc 'Frame of the SAM localization (normally "sam" frame)'+
+            'The SAM localization target frame is taken from the world frame of the transformer.'
+
+    property('odometry_localization_source_frame', '/std/string').
+        doc 'Frame of the Odometry localization (normally "body" frame)'+
+            'The odometry localization target frame is taken from the last SAM localization source frame.'
 
     property('error_per_distance_traveled', 'double').
         doc 'Unit error per distance traveled (0 - 1).'
@@ -65,7 +69,7 @@ task_context "Task" do
     ##########################
     transformer do
         transform "navigation", "world" # navigation in world in "Source IN target" convention
-	    transform "sensor", "body" # sensor in body in "Source IN target" convention
+        transform "sensor", "body" # sensor in body in "Source IN target" convention
     	align_port("delta_pose_samples", 0)
     	align_port("point_cloud_samples", 0)
     	max_latency(0.02)
@@ -74,8 +78,14 @@ task_context "Task" do
     #******************************
     #******* Output ports  ********
     #******************************
-    output_port('pose_samples_out', '/base/samples/RigidBodyState').
-	    doc 'Corrected estimated robot pose.'
+    output_port('sam_pose_samples_out', '/base/samples/RigidBodyState').
+	    doc 'Corrected estimated robot pose from SAM.'
+
+    output_port('odo_pose_samples_out', '/base/samples/RigidBodyState').
+	    doc 'Corrected estimated robot pose with last odometry poses.'
+
+    output_port("point_cloud_samples_out",  'base::samples::Pointcloud').
+        doc 'Map point cloud samples.'
 
     property('output_debug', 'bool', false).
         doc "Set to true in case you want to have filter debug information"

@@ -87,9 +87,7 @@ namespace sam {
         /******************************************/
 
         /** State of the filter **/
-        WMTKState last_state;
-
-        UKF::cov last_state_cov;
+        WMTKState pose_state;
 
         /** The pose prediction in an UT form **/
         boost::shared_ptr<UKF> filter;
@@ -111,7 +109,9 @@ namespace sam {
         /** Output port variables **/
         /***************************/
 
-        base::samples::RigidBodyState pose_out;
+        base::samples::RigidBodyState sam_pose_out;
+
+        base::samples::RigidBodyState odo_pose_out;
 
         /** Current map in point cloud form **/
         base::samples::Pointcloud base_point_cloud_map_out;
@@ -215,7 +215,7 @@ namespace sam {
 
         /**@brief Reset the UKF
          */
-        void resetUKF(::base::Pose &current_delta_pose, ::base::Vector6d &cov_current_delta_pose);
+        void resetUKF(::base::Pose &current_delta_pose, ::base::Matrix6d &cov_current_delta_pose);
 
         /**@brief Initialize the envire SAM
          */

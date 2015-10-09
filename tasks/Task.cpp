@@ -133,7 +133,7 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
 
     /** Current delta segment displacement (previous - current pose) in last
      * pose frame **/
-    double current_segment = (this->last_state.orient.inverse()*(this->last_state.pos - this->filter->mu().pos)).norm();
+    double current_segment = this->filter->mu().pos.norm();
 
     std::cout<<"CURRENT SEGMENT: "<<current_segment;
 
@@ -191,7 +191,7 @@ void Task::point_cloud_samplesTransformerCallback(const base::Time &ts, const ::
     /** Get the new point clouds **/
     base_point_cloud_in = point_cloud_samples_sample;
 
-    /** Transform the point cloud in body frame **/
+    /** Transform the point cloud in body frame (in case of needed) **/
     if (_sensor_frame.value().compare(_body_frame.value()) != 0)
     {
         //::sam::transformPointCloud(base_point_cloud_in, tf);
@@ -214,20 +214,29 @@ bool Task::configureHook()
     /** Configure Values  **/
     /***********************/
 
-    initFilter = false;
+    this->initFilter = false;
 
-    /** Output port **/
-    pose_out.invalidate();
-    pose_out.sourceFrame = _localization_source_frame.value();
+    /** SAM Output port **/
+    this->sam_pose_out.invalidate();
+    this->sam_pose_out.sourceFrame = _sam_localization_source_frame.value();
 
-    /** Relative Frame to port out the samples **/
-    pose_out.targetFrame = _world_frame.value();
+    /** Relative Frame to port out the SAM pose samples **/
+    this->sam_pose_out.targetFrame = _world_frame.value();
+
+    /** Odometry Output port **/
+    this->odo_pose_out.invalidate();
+    this->odo_pose_out.sourceFrame = _odometry_localization_source_frame.value();
+
+    /** Relative Frame to port out the Odometry pose samples **/
+    this->odo_pose_out.targetFrame = this->sam_pose_out.sourceFrame;
+
+    /** Reset info information **/
     this->info.accumulated_distance = 0.00;
 
     /***********************/
     /** Info and Warnings **/
     /***********************/
-    RTT::log(RTT::Warning)<<"[SAM TASK] DESIRED TARGET FRAME IS: "<<pose_out.targetFrame<<RTT::endlog();
+    RTT::log(RTT::Warning)<<"[SAM TASK] DESIRED TARGET FRAME IS: "<<sam_pose_out.targetFrame<<RTT::endlog();
     RTT::log(RTT::Warning)<<"[SAM TASK] ERROR PER DISTANCE TRAVELED: "<<_error_per_distance_traveled.value() *100<<"%"<<RTT::endlog();
 
     return true;
@@ -266,14 +275,6 @@ void Task::initialization(Eigen::Affine3d &tf)
     /** The filter vector state variables for the navigation quantities **/
     WMTKState statek_0;
 
-    /** Set the current pose to initialize the filter structure **/
-    statek_0.pos = tf.translation(); //!Initial position
-    statek_0.orient = Eigen::Quaternion<double>(tf.rotation());
-
-    /** Set the initial velocities in the state vector **/
-    statek_0.velo.setZero(); //!Initial linear velocity
-    statek_0.angvelo.setZero(); //!Initial angular velocity
-
     /******************************/
     /** Initialize the Back-End  **/
     /******************************/
@@ -290,11 +291,16 @@ void Task::initialization(Eigen::Affine3d &tf)
     this->initUKF(statek_0, P0);
 
     /** Initialization for ESAM **/
-    base::TransformWithCovariance pose(statek_0.pos, statek_0.orient, P0.block<6,6>(0,0));
+    base::TransformWithCovariance pose(tf.translation(), Eigen::Quaternion<double>(tf.rotation()), P0.block<6,6>(0,0));
     this->initESAM(pose);
 
-    /** Last state is init state **/
-    this->last_state = statek_0;
+    /** Accumulate pose in MTK state form **/
+    this->pose_state.pos = tf.translation(); //!Initial position
+    this->pose_state.orient = Eigen::Quaternion<double>(tf.rotation());
+
+    /** Set the initial velocities in the state vector **/
+    this->pose_state.velo.setZero(); //!Initial linear velocity
+    this->pose_state.angvelo.setZero(); //!Initial angular velocity
 
     return;
 }
@@ -325,7 +331,7 @@ void Task::updateESAM()
 {
     /** Reset the UKF **/
     ::base::Pose current_delta_pose;
-    ::base::Vector6d cov_current_delta_pose;
+    ::base::Matrix6d cov_current_delta_pose;
     this->resetUKF(current_delta_pose, cov_current_delta_pose);
 
     /** Set a new Factor in ESAM **/
@@ -340,9 +346,9 @@ void Task::updateESAM()
     std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_current_delta_pose<<"\n";
 
     ::base::TransformWithCovariance current_pose_with_cov;
-    current_pose_with_cov.translation = this->last_state.pos;
-    current_pose_with_cov.orientation = this->last_state.orient;
-    current_pose_with_cov.cov = this->last_state_cov.block<6,6>(0,0);
+    current_pose_with_cov.translation = this->pose_state.pos;
+    current_pose_with_cov.orientation = this->pose_state.orient;
+    current_pose_with_cov.cov = cov_current_delta_pose; // At this time the covariance is unknown
     this->esam->insertValue(frame_id, current_pose_with_cov);
 
     std::cout<<"********************************************\n";
@@ -356,22 +362,21 @@ void Task::updateESAM()
     return;
 }
 
-void Task::resetUKF(::base::Pose &current_delta_pose, ::base::Vector6d &cov_current_delta_pose)
+void Task::resetUKF(::base::Pose &current_delta_pose, ::base::Matrix6d &cov_current_delta_pose)
 {
 
     /** Compute the delta pose since last time we reset the filter **/
-    current_delta_pose.position = this->filter->mu().pos - this->last_state.pos;// Delta position origin frame
-    current_delta_pose.position = this->last_state.orient.inverse() * current_delta_pose.position;// Delta position in last frame
-    current_delta_pose.orientation = this->last_state.orient.inverse() * this->filter->mu().orient;// Delta orientation
+    current_delta_pose.position = this->filter->mu().pos;// Delta position
+    current_delta_pose.orientation = this->filter->mu().orient;// Delta orientation
 
     /** Compute the delta covariance since last time we reset the filter **/
-    /** The covariance is reset every step, then tehre is not need to compute
-     * the difference between last and current **/
-    cov_current_delta_pose = this->filter->sigma().block<6,6>(0,0).diagonal();
+    cov_current_delta_pose = this->filter->sigma().block<6,6>(0,0);
 
-    /** Update the last state **/
-    this->last_state = this->filter->mu();
-    this->last_state_cov = this->filter->sigma();
+    /** Update the pose state **/
+    this->pose_state.orient *= this->filter->mu().orient;// delta in orientation
+    this->pose_state.pos += this->pose_state.orient * this->filter->mu().pos;// delta in position
+    this->pose_state.velo = this->pose_state.orient * this->filter->mu().velo;// current linear velocity
+    this->pose_state.angvelo = this->pose_state.orient * this->filter->mu().angvelo;// current angular velocity
 
     /** Reset covariance matrix **/
     UKF::cov P(UKF::cov::Zero());
@@ -384,7 +389,8 @@ void Task::resetUKF(::base::Pose &current_delta_pose, ::base::Vector6d &cov_curr
     this->filter.reset();
 
     /** Create and reset a new filter **/
-    this->initUKF(this->last_state, P);
+    WMTKState statek;
+    this->initUKF(statek, P);
 
     return;
 }
@@ -431,15 +437,30 @@ void Task::outputPortSamples(const base::Time &timestamp)
 {
     WMTKState statek = this->filter->mu();
 
-    /** Out port the last pose **/
-    this->pose_out = this->esam->getRbsPose(this->esam->currentPoseId());
-    this->pose_out.time = timestamp;
-    this->pose_out.velocity = statek.velo;
-    this->pose_out.cov_velocity =  this->filter->sigma().block<3,3>(6,6);
-    this->pose_out.angular_velocity = statek.angvelo;
-    this->pose_out.cov_angular_velocity =  this->filter->sigma().block<3,3>(9,9);
-    _pose_samples_out.write(pose_out);
+    /** Out port the last pose in SAM values **/
+    this->sam_pose_out = this->esam->getRbsPose(this->esam->currentPoseId());
+    this->sam_pose_out.sourceFrame = _sam_localization_source_frame.value();
+    this->sam_pose_out.targetFrame = _world_frame.value();
+    this->sam_pose_out.time = timestamp;
+    this->sam_pose_out.velocity = this->sam_pose_out.orientation * statek.velo;
+    base::Matrix3d rotation_in_matrix = this->sam_pose_out.orientation.toRotationMatrix();
+    this->sam_pose_out.cov_velocity =  rotation_in_matrix * this->filter->sigma().block<3,3>(6,6) * rotation_in_matrix.transpose();
+    this->sam_pose_out.angular_velocity = this->sam_pose_out.orientation * statek.angvelo;
+    this->sam_pose_out.cov_angular_velocity =  rotation_in_matrix * this->filter->sigma().block<3,3>(9,9) * rotation_in_matrix.transpose();
+    _sam_pose_samples_out.write(this->sam_pose_out);
 
+    /** Out port the last odometry pose **/
+    this->odo_pose_out.position = statek.pos;
+    this->odo_pose_out.cov_position = this->filter->sigma().block<3,3>(0,0);
+    this->odo_pose_out.orientation = statek.orient;
+    this->odo_pose_out.cov_orientation = this->filter->sigma().block<3,3>(3,3);
+    this->odo_pose_out.velocity = statek.velo;
+    this->odo_pose_out.cov_velocity =  this->filter->sigma().block<3,3>(6,6);
+    this->odo_pose_out.angular_velocity = statek.angvelo;
+    this->odo_pose_out.cov_angular_velocity =  this->filter->sigma().block<3,3>(9,9);
+    _odo_pose_samples_out.write(this->odo_pose_out);
+
+    /** Debug information **/
     if (_output_debug.value())
     {
         if (_output_debug.value())
