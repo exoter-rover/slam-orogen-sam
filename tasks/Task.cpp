@@ -159,6 +159,8 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         }
     }
 
+    std::cout<<"\n";
+
     #ifdef DEBUG_EXECUTION_TIME
     clock_t end = clock();
     double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -172,6 +174,11 @@ void Task::point_cloud_samplesTransformerCallback(const base::Time &ts, const ::
 {
     ::base::samples::Pointcloud base_point_cloud_in;
     Eigen::Affine3d tf; /** Transformer transformation **/
+
+    if(!initFilter)
+    {
+        return;
+    }
 
     /** Get the transformation **/
     if (_sensor_frame.value().compare(_body_frame.value()) == 0)
@@ -194,16 +201,24 @@ void Task::point_cloud_samplesTransformerCallback(const base::Time &ts, const ::
     /** Transform the point cloud in body frame (in case of needed) **/
     if (_sensor_frame.value().compare(_body_frame.value()) != 0)
     {
-        envire::sam::transformPointCloud(base_point_cloud_in, tf);
+        this->esam->transformPointCloud(base_point_cloud_in, tf);
     }
+     #ifdef DEBUG_PRINTS
+    RTT::log(RTT::Warning)<<"[SAM POINT_CLOUD_SAMPLES] Transformed Point cloud "<<RTT::endlog();
+    #endif
 
-    /** Push the point cloud in ESAM **/
+    /** Transform point cloud to the current node frame **/
     Eigen::Affine3d delta_tf (this->filter->mu().orient);
     delta_tf.translation() = this->filter->mu().pos;
+    this->esam->transformPointCloud(base_point_cloud_in, delta_tf);
+
+    /** Push the point cloud in ESAM **/
     this->esam->pushPointCloud(base_point_cloud_in,
             static_cast<int>(_sensor_point_cloud_height.value()),
-            static_cast<int>(_sensor_point_cloud_width.value()),
-            delta_tf);
+            static_cast<int>(_sensor_point_cloud_width.value()));
+
+    /** Port out the point cloud **/
+    this->outputPortPointCloud(base_point_cloud_in.time);
 }
 
 /// The following lines are template definitions for the various state machine
@@ -479,6 +494,18 @@ void Task::outputPortSamples(const base::Time &timestamp)
             _task_info_out.write(info);
         }
     }
+
+    return;
+}
+
+void Task::outputPortPointCloud(const base::Time &timestamp)
+{
+    /** Marge all point cloud in esam **/
+    this->esam->mergePointClouds(this->base_point_cloud_map_out);
+
+    /** Port out the point cloud **/
+    this->base_point_cloud_map_out.time = timestamp;
+    _point_cloud_samples_out.write(this->base_point_cloud_map_out);
 
     return;
 }

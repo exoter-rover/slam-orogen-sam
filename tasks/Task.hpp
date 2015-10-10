@@ -70,6 +70,9 @@ namespace sam {
     {
 	friend class TaskBase;
 
+ public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW //Structures having Eigen members
+
     protected:
         /******************************/
         /*** Control Flow Variables ***/
@@ -225,10 +228,14 @@ namespace sam {
          */
         bool checkSegmentCov(const double &current_segment);
 
-
         /** @brief Port out the values
         */
         void outputPortSamples(const base::Time &timestamp);
+
+        /** @brief Port out the Point Cloud map
+        */
+        void outputPortPointCloud(const base::Time &timestamp);
+
 
     };
 }
