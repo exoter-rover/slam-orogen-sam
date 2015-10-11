@@ -149,11 +149,19 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
             /** Update accumulated distance **/
             this->info.accumulated_distance += current_segment;
 
+            /** Keypoints at local Point cloud **/
+            std::cout<<"KEYPOINTS AND FEATURES DESCRIPTORS\n";
+            this->esam->keypointsPointCloud();
+
             /** Update ESAM **/
             this->updateESAM();
             this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
+
+            /** Optimize ESAM **/
             std::cout<<"OPTIMIZE!!!\n";
             this->esam->optimize();
+
+            /** MARGINALS **/
             std::cout<<"MARGINALS!!!\n";
             this->esam->printMarginals();
         }
@@ -238,6 +246,7 @@ bool Task::configureHook()
 
     this->bfilter_config = _bfilter_config.get();
     this->outlier_config = _outlier_config.get();
+    this->sift_config = _sift_config.get();
 
     /** SAM Output port **/
     this->sam_pose_out.invalidate();
@@ -281,6 +290,8 @@ void Task::errorHook()
 void Task::stopHook()
 {
     TaskBase::stopHook();
+
+    this->esam->writePlyFile(this->base_point_cloud_map_out, _output_ply.value());
 }
 void Task::cleanupHook()
 {
@@ -426,7 +437,7 @@ void Task::initESAM(base::TransformWithCovariance &tf_cov)
 
     /** ESAM constructor set the prior factor **/
     this->esam.reset(new envire::sam::ESAM(tf_cov, 'x', 'l',
-                this->bfilter_config, this->outlier_config));
+                this->bfilter_config, this->outlier_config, this->sift_config));
 
     /** Set the initial pose value **/
     this->esam->addPoseValue(tf_cov);
@@ -501,7 +512,7 @@ void Task::outputPortSamples(const base::Time &timestamp)
 void Task::outputPortPointCloud(const base::Time &timestamp)
 {
     /** Marge all point cloud in esam **/
-    this->esam->mergePointClouds(this->base_point_cloud_map_out);
+    this->esam->mergePointClouds(this->base_point_cloud_map_out, true);
 
     /** Port out the point cloud **/
     this->base_point_cloud_map_out.time = timestamp;

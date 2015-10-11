@@ -55,6 +55,9 @@ task_context "Task" do
     property('outlier_config', 'envire::sam::OutlierRemovalParams').
 	doc 'Configuration parameters for Radius Outlier Removal filter.'
 
+    property('sift_config', 'envire::sam::SIFTKeypointParams').
+	doc 'Configuration parameters for SIFT Keypoints.'
+
     #******************************
     #******* Input ports  *********
     #******************************

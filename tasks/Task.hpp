@@ -82,8 +82,15 @@ namespace sam {
         /**************************/
         /*** Property Variables ***/
         /**************************/
-        envire::sam::BilateralFilterParams bfilter_config; /** Bilateral filter Configuration **/
-        envire::sam::OutlierRemovalParams outlier_config; /** Outlier Filter Removal Configuration **/
+
+        /** Bilateral filter Configuration **/
+        envire::sam::BilateralFilterParams bfilter_config;
+
+        /** Outlier Filter Removal Configuration **/
+        envire::sam::OutlierRemovalParams outlier_config;
+
+        /** SIFT Keypoints **/
+        envire::sam::SIFTKeypointParams sift_config;
 
         /******************************************/
         /*** General Internal Storage Variables ***/
