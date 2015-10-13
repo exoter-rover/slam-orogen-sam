@@ -143,15 +143,11 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         std::cout<<" IS BIGGER THAN "<<_distance_segment.value()<<"\n";
 
         /** Only add a new node in case the covariance is bigger than the
-         * percentage error defined in the task property**/
+         * percentage error defined in the task property **/
         if (this->checkSegmentCov(current_segment))
         {
             /** Update accumulated distance **/
             this->info.accumulated_distance += current_segment;
-
-            /** Keypoints at local Point cloud **/
-            std::cout<<"KEYPOINTS AND FEATURES DESCRIPTORS\n";
-            this->esam->keypointsPointCloud();
 
             /** Update ESAM **/
             this->updateESAM();
@@ -161,9 +157,16 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
             std::cout<<"OPTIMIZE!!!\n";
             this->esam->optimize();
 
-            /** MARGINALS **/
+            /** Marginals **/
             std::cout<<"MARGINALS!!!\n";
             this->esam->printMarginals();
+
+            /** Detect Landmarks **/
+            std::cout<<"[SAM] DETECT LANDMARKS\n";
+            this->esam->detectLandmarks();
+
+            /** Write local point cloud **/
+            this->esam->currentPointCloudtoPLY("point_cloud_", true);
         }
     }
 
@@ -363,7 +366,13 @@ void Task::initUKF(WMTKState &statek, UKF::cov &statek_cov)
 
 void Task::updateESAM()
 {
+
+    /** Keypoints at local Point cloud **/
+    std::cout<<"[SAM] KEYPOINTS AND FEATURES DESCRIPTORS\n";
+    //this->esam->keypointsPointCloud();
+
     /** Reset the UKF **/
+    std::cout<<"[SAM] RESET UKF\n";
     ::base::Pose current_delta_pose;
     ::base::Matrix6d cov_current_delta_pose;
     this->resetUKF(current_delta_pose, cov_current_delta_pose);
