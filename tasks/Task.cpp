@@ -250,6 +250,7 @@ bool Task::configureHook()
     this->bfilter_config = _bfilter_config.get();
     this->outlier_config = _outlier_config.get();
     this->sift_config = _sift_config.get();
+    this->feature_config = _feature_config.get();
 
     /** SAM Output port **/
     this->sam_pose_out.invalidate();
@@ -367,10 +368,6 @@ void Task::initUKF(WMTKState &statek, UKF::cov &statek_cov)
 void Task::updateESAM()
 {
 
-    /** Keypoints at local Point cloud **/
-    std::cout<<"[SAM] KEYPOINTS AND FEATURES DESCRIPTORS\n";
-    //this->esam->keypointsPointCloud();
-
     /** Reset the UKF **/
     std::cout<<"[SAM] RESET UKF\n";
     ::base::Pose current_delta_pose;
@@ -446,7 +443,9 @@ void Task::initESAM(base::TransformWithCovariance &tf_cov)
 
     /** ESAM constructor set the prior factor **/
     this->esam.reset(new envire::sam::ESAM(tf_cov, 'x', 'l',
-                this->bfilter_config, this->outlier_config, this->sift_config));
+                _downsample_size.value(),
+                this->bfilter_config, this->outlier_config,
+                this->sift_config, this->feature_config));
 
     /** Set the initial pose value **/
     this->esam->addPoseValue(tf_cov);

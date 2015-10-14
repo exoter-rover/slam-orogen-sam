@@ -49,6 +49,9 @@ task_context "Task" do
     property("output_ply", "/std/string", "").
 	doc "resulting ply file"
 
+    property('downsample_size', 'float').
+	doc 'Voxel size in meters of the downsample point cloud'
+
     property('bfilter_config', 'envire::sam::BilateralFilterParams').
 	doc 'Configuration parameters for Bilateral filter.'
 
@@ -57,6 +60,9 @@ task_context "Task" do
 
     property('sift_config', 'envire::sam::SIFTKeypointParams').
 	doc 'Configuration parameters for SIFT Keypoints.'
+
+    property('feature_config', 'envire::sam::PFHFeatureParams').
+	doc 'Configuration parameters for Feature descriptor.'
 
     #******************************
     #******* Input ports  *********

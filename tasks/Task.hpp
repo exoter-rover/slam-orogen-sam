@@ -92,6 +92,9 @@ namespace sam {
         /** SIFT Keypoints **/
         envire::sam::SIFTKeypointParams sift_config;
 
+        /** Feature descriptor **/
+        envire::sam::PFHFeatureParams feature_config;
+
         /******************************************/
         /*** General Internal Storage Variables ***/
         /******************************************/
