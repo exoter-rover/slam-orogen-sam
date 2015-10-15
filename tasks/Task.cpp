@@ -161,9 +161,16 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
             std::cout<<"MARGINALS!!!\n";
             this->esam->printMarginals();
 
+            /** Compute Features Keypoints **/
+            std::cout<<"[SAM] COMPUTE KEYPOINTS AND FEATURES\n";
+            this->esam->computeKeypoints();
+
             /** Detect Landmarks **/
             std::cout<<"[SAM] DETECT LANDMARKS\n";
             this->esam->detectLandmarks();
+
+            /** Write graph into GraphViz **/
+            this->esam->graphViz("esam_graph.dot");
 
             /** Write local point cloud **/
             this->esam->currentPointCloudtoPLY("point_cloud_", true);
@@ -203,7 +210,7 @@ void Task::point_cloud_samplesTransformerCallback(const base::Time &ts, const ::
     }
 
     #ifdef DEBUG_PRINTS
-    RTT::log(RTT::Warning)<<"[SAM POINT_CLOUD_SAMPLES] Received new samples at "<<point_cloud_samples_sample.time.toString()<<RTT::endlog();
+    //RTT::log(RTT::Warning)<<"[SAM POINT_CLOUD_SAMPLES] Received new samples at "<<point_cloud_samples_sample.time.toString()<<RTT::endlog();
     #endif
 
     /** Get the new point clouds **/
@@ -214,8 +221,8 @@ void Task::point_cloud_samplesTransformerCallback(const base::Time &ts, const ::
     {
         this->esam->transformPointCloud(base_point_cloud_in, tf);
     }
-     #ifdef DEBUG_PRINTS
-    RTT::log(RTT::Warning)<<"[SAM POINT_CLOUD_SAMPLES] Transformed Point cloud "<<RTT::endlog();
+    #ifdef DEBUG_PRINTS
+    //RTT::log(RTT::Warning)<<"[SAM POINT_CLOUD_SAMPLES] Transformed Point cloud "<<RTT::endlog();
     #endif
 
     /** Transform point cloud to the current node frame **/
@@ -374,16 +381,21 @@ void Task::updateESAM()
     ::base::Matrix6d cov_current_delta_pose;
     this->resetUKF(current_delta_pose, cov_current_delta_pose);
 
+    /** Compute variance **/
+    Eigen::SelfAdjointEigenSolver<base::Matrix6d> ev(cov_current_delta_pose);
+    base::Vector6d var_current_delta_pose = ev.eigenvalues();
+
     /** Set a new Factor in ESAM **/
-    this->esam->addDeltaPoseFactor(this->delta_pose.time, current_delta_pose, cov_current_delta_pose);
+    this->esam->addDeltaPoseFactor(this->delta_pose.time,
+            current_delta_pose, var_current_delta_pose);
 
     /** Set a new Value in ESAM **/
     std::string frame_id = this->esam->currentPoseId();
     std::cout<<"[SAM] CURRENT POSE ID: "<<frame_id<<"\n";
-    std::cout<<"[SAM] CURRENT DELTA POSITION:\n"<<current_delta_pose.position<<"\n";
-    std::cout<<"[SAM] CURRENT DELTA ORIENTATION ROLL: "<< base::getRoll(current_delta_pose.orientation)*R2D
-        <<" PITCH: "<< base::getPitch(current_delta_pose.orientation)*R2D<<" YAW: "<< base::getYaw(current_delta_pose.orientation)*R2D<<std::endl;
-    std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_current_delta_pose<<"\n";
+    //std::cout<<"[SAM] CURRENT DELTA POSITION:\n"<<current_delta_pose.position<<"\n";
+    //std::cout<<"[SAM] CURRENT DELTA ORIENTATION ROLL: "<< base::getRoll(current_delta_pose.orientation)*R2D
+    //    <<" PITCH: "<< base::getPitch(current_delta_pose.orientation)*R2D<<" YAW: "<< base::getYaw(current_delta_pose.orientation)*R2D<<std::endl;
+    //std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_current_delta_pose<<"\n";
 
     ::base::TransformWithCovariance current_pose_with_cov;
     current_pose_with_cov.translation = this->pose_state.pos;
@@ -391,13 +403,11 @@ void Task::updateESAM()
     current_pose_with_cov.cov = cov_current_delta_pose; // At this time the covariance is unknown
     this->esam->insertValue(frame_id, current_pose_with_cov);
 
-    std::cout<<"********************************************\n";
-    std::cout<<"[SAM] CURRENT POSITION:\n"<<current_pose_with_cov.translation<<"\n";
-    std::cout<<"[SAM] CURRENT ORIENTATION ROLL: "<< base::getRoll(current_pose_with_cov.orientation)*R2D
-        <<" PITCH: "<< base::getPitch(current_pose_with_cov.orientation)*R2D<<" YAW: "<< base::getYaw(current_pose_with_cov.orientation)*R2D<<std::endl;
-    std::cout<<"[SAM] CURRENT COVARIANCE:\n"<<current_pose_with_cov.cov<<"\n";
-
-    this->esam->graphViz("esam_graph.dot");
+    //std::cout<<"********************************************\n";
+    //std::cout<<"[SAM] CURRENT POSITION:\n"<<current_pose_with_cov.translation<<"\n";
+    //std::cout<<"[SAM] CURRENT ORIENTATION ROLL: "<< base::getRoll(current_pose_with_cov.orientation)*R2D
+    //    <<" PITCH: "<< base::getPitch(current_pose_with_cov.orientation)*R2D<<" YAW: "<< base::getYaw(current_pose_with_cov.orientation)*R2D<<std::endl;
+    //std::cout<<"[SAM] CURRENT COVARIANCE:\n"<<current_pose_with_cov.cov<<"\n";
 
     return;
 }
@@ -465,7 +475,7 @@ bool Task::checkSegmentCov(const double &current_segment)
     Eigen::Vector3d e_val = ev.eigenvalues();
     const double error = Eigen::Vector3d(e_val.array().sqrt()).norm();
 
-    std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_segment_position<<"\n";
+    //std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_segment_position<<"\n";
     std::cout<<"[SAM] CURRENT NORM ERROR: "<<error<<"\n";
     std::cout<<"[SAM] TARGET NORM ERROR: "<<_error_per_distance_traveled.value() * current_segment<<"\n";
     if (error > _error_per_distance_traveled.value() * current_segment)
