@@ -64,6 +64,9 @@ task_context "Task" do
     property('feature_config', 'envire::sam::PFHFeatureParams').
 	doc 'Configuration parameters for Feature descriptor.'
 
+    property('point_variance', 'base::Vector3d').
+	doc 'Error variance in meters to estimate the point position by the sensing device.'
+
     #******************************
     #******* Input ports  *********
     #******************************

@@ -15,15 +15,23 @@
 
 namespace sam {
 
+
+    /** Pose correspondences **/
+    struct PoseCorrespondence
+    {
+        int node_idx;
+        std::vector<int> correspondences_idx;
+    };
+
     /** Output port type **/
     struct Information
     {
         base::Time time; //time-stamp
         base::Time predict_execution_time;
         double accumulated_distance;
-        std::vector< base::samples::RigidBodyState > pose_nodes_rbs; //Rbs with the orientation and position of the contact point
-        std::vector< base::samples::RigidBodyState > landmark_nodes_rbs; //Rbs with the orientation and position of the contact point
-        std::vector< base::samples::Pointcloud > point_clouds; //Rbs with the orientation and position of the contact point
+        std::vector< base::samples::RigidBodyState > pose_nodes_rbs; //Rbs of the poses in the node graph
+        std::vector< base::samples::RigidBodyState > landmark_nodes_rbs; //Rbs of the landmarks in the node graph
+        std::vector< PoseCorrespondence > poses_correspondences; //Idx of the poses correspondences to find matches
     };
 
 }

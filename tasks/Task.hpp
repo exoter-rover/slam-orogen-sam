@@ -246,6 +246,10 @@ namespace sam {
         */
         void outputPortPointCloud(const base::Time &timestamp);
 
+        /** @brief Port out the Point Cloud map
+        */
+        void updateInformation(const int &current_segment);
+
 
     };
 }

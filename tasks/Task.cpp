@@ -87,7 +87,7 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         }
 
         #ifdef DEBUG_PRINTS
-        RTT::log(RTT::Warning)<<"[SAM POSE_SAMPLES] - Initializing Filter..."<<RTT::endlog();
+        //RTT::log(RTT::Warning)<<"[SAM POSE_SAMPLES] - Initializing Filter..."<<RTT::endlog();
         #endif
 
         /** Initialization of the back-end **/
@@ -97,7 +97,7 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         this->delta_pose = delta_pose_samples_sample;
 
         #ifdef DEBUG_PRINTS
-        RTT::log(RTT::Warning)<<"[DONE]\n";
+        //RTT::log(RTT::Warning)<<"[DONE]\n";
         #endif
 
         initFilter = true;
@@ -105,8 +105,8 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
 
     const double predict_delta_t = delta_pose_samples_sample.time.toSeconds() - this->delta_pose.time.toSeconds();
     #ifdef DEBUG_PRINTS
-    RTT::log(RTT::Warning)<<"[SAM POSE_SAMPLES] Received new samples at "<<delta_pose_samples_sample.time.toString()<<RTT::endlog();
-    RTT::log(RTT::Warning)<<"[SAM POSE_SAMPLES] delta_t: "<<predict_delta_t<<RTT::endlog();
+    //RTT::log(RTT::Warning)<<"[SAM POSE_SAMPLES] Received new samples at "<<delta_pose_samples_sample.time.toString()<<RTT::endlog();
+    //RTT::log(RTT::Warning)<<"[SAM POSE_SAMPLES] delta_t: "<<predict_delta_t<<RTT::endlog();
     #endif
 
     /** A new sample arrived to the input port **/
@@ -146,20 +146,9 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
          * percentage error defined in the task property **/
         if (this->checkSegmentCov(current_segment))
         {
-            /** Update accumulated distance **/
-            this->info.accumulated_distance += current_segment;
-
             /** Update ESAM **/
             this->updateESAM();
             this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
-
-            /** Optimize ESAM **/
-            std::cout<<"OPTIMIZE!!!\n";
-            this->esam->optimize();
-
-            /** Marginals **/
-            std::cout<<"MARGINALS!!!\n";
-            this->esam->printMarginals();
 
             /** Compute Features Keypoints **/
             std::cout<<"[SAM] COMPUTE KEYPOINTS AND FEATURES\n";
@@ -174,6 +163,9 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
 
             /** Write local point cloud **/
             this->esam->currentPointCloudtoPLY("point_cloud_", true);
+
+            /** Update Information **/
+            this->updateInformation(current_segment);
         }
     }
 
@@ -400,8 +392,8 @@ void Task::updateESAM()
     ::base::TransformWithCovariance current_pose_with_cov;
     current_pose_with_cov.translation = this->pose_state.pos;
     current_pose_with_cov.orientation = this->pose_state.orient;
-    current_pose_with_cov.cov = cov_current_delta_pose; // At this time the covariance is unknown
-    this->esam->insertValue(frame_id, current_pose_with_cov);
+    current_pose_with_cov.cov = cov_current_delta_pose; // At this time the covariance is just from the UKF prediction
+    this->esam->insertPoseValue(frame_id, current_pose_with_cov);
 
     //std::cout<<"********************************************\n";
     //std::cout<<"[SAM] CURRENT POSITION:\n"<<current_pose_with_cov.translation<<"\n";
@@ -455,7 +447,8 @@ void Task::initESAM(base::TransformWithCovariance &tf_cov)
     this->esam.reset(new envire::sam::ESAM(tf_cov, 'x', 'l',
                 _downsample_size.value(),
                 this->bfilter_config, this->outlier_config,
-                this->sift_config, this->feature_config));
+                this->sift_config, this->feature_config,
+                _point_variance.value()));
 
     /** Set the initial pose value **/
     this->esam->addPoseValue(tf_cov);
@@ -539,3 +532,13 @@ void Task::outputPortPointCloud(const base::Time &timestamp)
     return;
 }
 
+void Task::updateInformation(const int &current_segment)
+{
+    /** Update accumulated distance **/
+    this->info.accumulated_distance += current_segment;
+
+    /** Update pose correspondences for landmarks **/
+    sam::PoseCorrespondence pose;
+    pose.node_idx = this->esam->getPoseCorrespodences(pose.correspondences_idx);
+    this->info.poses_correspondences.push_back(pose);
+}
