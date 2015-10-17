@@ -339,6 +339,10 @@ void Task::initialization(Eigen::Affine3d &tf)
     this->pose_state.velo.setZero(); //!Initial linear velocity
     this->pose_state.angvelo.setZero(); //!Initial angular velocity
 
+    /** Accumulate pose in TWC form **/
+    this->pose_with_cov.translation = tf.translation();
+    this->pose_with_cov.orientation = this->pose_state.orient;
+
     return;
 }
 
@@ -369,37 +373,48 @@ void Task::updateESAM()
 
     /** Reset the UKF **/
     std::cout<<"[SAM] RESET UKF\n";
-    ::base::Pose current_delta_pose;
-    ::base::Matrix6d cov_current_delta_pose;
-    this->resetUKF(current_delta_pose, cov_current_delta_pose);
+    ::base::Pose delta_pose;
+    ::base::Matrix6d cov_delta_pose;
+    this->resetUKF(delta_pose, cov_delta_pose);
+
+    /**************************/
+    /** DELTA POSE IN FACTOR **/
+    /**************************/
 
     /** Compute variance **/
-    Eigen::SelfAdjointEigenSolver<base::Matrix6d> ev(cov_current_delta_pose);
-    base::Vector6d var_current_delta_pose = ev.eigenvalues();
+    Eigen::SelfAdjointEigenSolver<base::Matrix6d> ev(cov_delta_pose);
+    base::Vector6d var_delta_pose = ev.eigenvalues();
 
     /** Set a new Factor in ESAM **/
-    this->esam->addDeltaPoseFactor(this->delta_pose.time,
-            current_delta_pose, var_current_delta_pose);
+    this->esam->addDeltaPoseFactor(this->delta_pose.time, delta_pose, var_delta_pose);
 
-    /** Set a new Value in ESAM **/
     std::string frame_id = this->esam->currentPoseId();
     std::cout<<"[SAM] CURRENT POSE ID: "<<frame_id<<"\n";
-    std::cout<<"[SAM] CURRENT DELTA POSITION:\n"<<current_delta_pose.position<<"\n";
-    std::cout<<"[SAM] CURRENT DELTA ORIENTATION ROLL: "<< base::getRoll(current_delta_pose.orientation)*R2D
-        <<" PITCH: "<< base::getPitch(current_delta_pose.orientation)*R2D<<" YAW: "<< base::getYaw(current_delta_pose.orientation)*R2D<<std::endl;
-    std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_current_delta_pose<<"\n";
+    std::cout<<"[SAM] CURRENT DELTA POSITION:\n"<<delta_pose.position<<"\n";
+    std::cout<<"[SAM] CURRENT DELTA ORIENTATION ROLL: "<< base::getRoll(delta_pose.orientation)*R2D
+        <<" PITCH: "<< base::getPitch(delta_pose.orientation)*R2D<<" YAW: "<< base::getYaw(delta_pose.orientation)*R2D<<std::endl;
+    std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_delta_pose<<"\n";
 
-    ::base::TransformWithCovariance current_pose_with_cov;
-    current_pose_with_cov.translation = this->pose_state.pos;
-    current_pose_with_cov.orientation = this->pose_state.orient;
-    current_pose_with_cov.cov = cov_current_delta_pose; // At this time the covariance is just from the UKF prediction
-    this->esam->insertPoseValue(frame_id, current_pose_with_cov);
+    /**************************/
+    /**  POSE IN ESTIMATES   **/
+    /**************************/
+
+    /** Compute the pose estimate **/
+    ::base::TransformWithCovariance delta_pose_with_cov(delta_pose.position, delta_pose.orientation, cov_delta_pose);
+    this->pose_with_cov =  this->pose_with_cov * delta_pose_with_cov;
+
+    /** Update the pose in pose state **/
+    this->pose_state.pos = this->pose_with_cov.translation;
+    this->pose_state.orient = static_cast<Eigen::Quaterniond>(this->pose_with_cov.orientation);
+
+    /** Insert the pose estimated value into ESAM **/
+    this->esam->insertPoseValue(frame_id, this->pose_with_cov);
 
     std::cout<<"********************************************\n";
-    std::cout<<"[SAM] CURRENT POSITION:\n"<<current_pose_with_cov.translation<<"\n";
-    std::cout<<"[SAM] CURRENT ORIENTATION ROLL: "<< base::getRoll(current_pose_with_cov.orientation)*R2D
-        <<" PITCH: "<< base::getPitch(current_pose_with_cov.orientation)*R2D<<" YAW: "<< base::getYaw(current_pose_with_cov.orientation)*R2D<<std::endl;
-    std::cout<<"[SAM] CURRENT COVARIANCE:\n"<<current_pose_with_cov.cov<<"\n";
+    std::cout<<"[SAM] CURRENT POSITION:\n"<<this->pose_with_cov.translation<<"\n";
+    std::cout<<"[SAM] CURRENT ORIENTATION ROLL: "<< base::getRoll(this->pose_with_cov.orientation)*R2D
+        <<" PITCH: "<< base::getPitch(this->pose_with_cov.orientation)*R2D<<" YAW: "<< base::getYaw(this->pose_with_cov.orientation)*R2D<<std::endl;
+    std::cout<<"[SAM] CURRENT COVARIANCE:\n"<<this->pose_with_cov.cov<<"\n";
 
     return;
 }
@@ -414,11 +429,9 @@ void Task::resetUKF(::base::Pose &current_delta_pose, ::base::Matrix6d &cov_curr
     /** Compute the delta covariance since last time we reset the filter **/
     cov_current_delta_pose = this->filter->sigma().block<6,6>(0,0);
 
-    /** Update the pose state **/
-    this->pose_state.pos += this->pose_state.orient * this->filter->mu().pos;// delta in position
+    /** Update the velocity in the pose state **/
     this->pose_state.velo = this->pose_state.orient * this->filter->mu().velo;// current linear velocity
     this->pose_state.angvelo = this->pose_state.orient * this->filter->mu().angvelo;// current angular velocity
-    this->pose_state.orient *= this->filter->mu().orient;// delta in orientation
 
     /** Reset covariance matrix **/
     UKF::cov P(UKF::cov::Zero());

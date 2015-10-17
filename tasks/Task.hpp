@@ -100,6 +100,9 @@ namespace sam {
         /******************************************/
 
         /** State of the filter **/
+        base::TransformWithCovariance pose_with_cov;
+
+        /** State of the filter **/
         WMTKState pose_state;
 
         /** The pose prediction in an UT form **/
@@ -107,9 +110,6 @@ namespace sam {
 
         /** Envire Smoothing and Mapping **/
         boost::shared_ptr<envire::sam::ESAM> esam;
-
-        /** Last pose stored on the esam **/
-        base::TransformWithCovariance last_esam_pose;
 
         /**************************/
         /** Input port variables **/
