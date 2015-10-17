@@ -148,28 +148,28 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         {
             /** Update ESAM **/
             this->updateESAM();
-//            this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
-//
-//            /** Compute Features Keypoints **/
-//            std::cout<<"[SAM] COMPUTE KEYPOINTS AND FEATURES\n";
-//            this->esam->computeKeypoints();
-//
-//            /** Detect Landmarks **/
-//            std::cout<<"[SAM] DETECT LANDMARKS\n";
-//            this->esam->detectLandmarks(this->delta_pose.time);
-//
-//            /** Write graph into GraphViz **/
-//            this->esam->graphViz("esam_graph.dot");
-//
-//            /** Write local point cloud **/
-//            this->esam->currentPointCloudtoPLY("point_cloud_", true);
-//
-//            /** Update Information **/
-//            this->updateInformation(current_segment);
+            this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
+
+            /** Compute Features Keypoints **/
+            std::cout<<"[SAM] COMPUTE KEYPOINTS AND FEATURES\n";
+            this->esam->computeKeypoints();
+
+            /** Detect Landmarks **/
+            std::cout<<"[SAM] DETECT LANDMARKS\n";
+            this->esam->detectLandmarks(this->delta_pose.time);
+
+            /** Write graph into GraphViz **/
+            this->esam->graphViz("esam_graph.dot");
+
+            /** Write local point cloud **/
+            this->esam->currentPointCloudtoPLY("point_cloud_", true);
+
+            /** Update Information **/
+            this->updateInformation(current_segment);
         }
     }
 
-    std::cout<<"\n";
+//    std::cout<<"\n";
 
     #ifdef DEBUG_EXECUTION_TIME
     clock_t end = clock();
@@ -547,6 +547,9 @@ void Task::outputPortPointCloud(const base::Time &timestamp)
 
 void Task::updateInformation(const int &current_segment)
 {
+    /** Update pose with cov from the last SAM result **/
+    this->pose_with_cov = this->esam->getTransformPose(this->esam->currentPoseId());
+
     /** Update accumulated distance **/
     this->info.accumulated_distance += current_segment;
 
