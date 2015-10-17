@@ -135,12 +135,12 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
      * pose frame **/
     double current_segment = this->filter->mu().pos.norm();
 
-    std::cout<<"CURRENT SEGMENT: "<<current_segment;
+//    std::cout<<"CURRENT SEGMENT: "<<current_segment;
 
     /** Check the distance traveled **/
     if(current_segment > _distance_segment.value())
     {
-        std::cout<<" IS BIGGER THAN "<<_distance_segment.value()<<"\n";
+//        std::cout<<" IS BIGGER THAN "<<_distance_segment.value()<<"\n";
 
         /** Only add a new node in case the covariance is bigger than the
          * percentage error defined in the task property **/
@@ -148,24 +148,24 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         {
             /** Update ESAM **/
             this->updateESAM();
-            this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
-
-            /** Compute Features Keypoints **/
-            std::cout<<"[SAM] COMPUTE KEYPOINTS AND FEATURES\n";
-            this->esam->computeKeypoints();
-
-            /** Detect Landmarks **/
-            std::cout<<"[SAM] DETECT LANDMARKS\n";
-            this->esam->detectLandmarks(this->delta_pose.time);
-
-            /** Write graph into GraphViz **/
-            this->esam->graphViz("esam_graph.dot");
-
-            /** Write local point cloud **/
-            this->esam->currentPointCloudtoPLY("point_cloud_", true);
-
-            /** Update Information **/
-            this->updateInformation(current_segment);
+//            this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
+//
+//            /** Compute Features Keypoints **/
+//            std::cout<<"[SAM] COMPUTE KEYPOINTS AND FEATURES\n";
+//            this->esam->computeKeypoints();
+//
+//            /** Detect Landmarks **/
+//            std::cout<<"[SAM] DETECT LANDMARKS\n";
+//            this->esam->detectLandmarks(this->delta_pose.time);
+//
+//            /** Write graph into GraphViz **/
+//            this->esam->graphViz("esam_graph.dot");
+//
+//            /** Write local point cloud **/
+//            this->esam->currentPointCloudtoPLY("point_cloud_", true);
+//
+//            /** Update Information **/
+//            this->updateInformation(current_segment);
         }
     }
 
@@ -384,10 +384,10 @@ void Task::updateESAM()
     /** Set a new Value in ESAM **/
     std::string frame_id = this->esam->currentPoseId();
     std::cout<<"[SAM] CURRENT POSE ID: "<<frame_id<<"\n";
-    //std::cout<<"[SAM] CURRENT DELTA POSITION:\n"<<current_delta_pose.position<<"\n";
-    //std::cout<<"[SAM] CURRENT DELTA ORIENTATION ROLL: "<< base::getRoll(current_delta_pose.orientation)*R2D
-    //    <<" PITCH: "<< base::getPitch(current_delta_pose.orientation)*R2D<<" YAW: "<< base::getYaw(current_delta_pose.orientation)*R2D<<std::endl;
-    //std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_current_delta_pose<<"\n";
+    std::cout<<"[SAM] CURRENT DELTA POSITION:\n"<<current_delta_pose.position<<"\n";
+    std::cout<<"[SAM] CURRENT DELTA ORIENTATION ROLL: "<< base::getRoll(current_delta_pose.orientation)*R2D
+        <<" PITCH: "<< base::getPitch(current_delta_pose.orientation)*R2D<<" YAW: "<< base::getYaw(current_delta_pose.orientation)*R2D<<std::endl;
+    std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_current_delta_pose<<"\n";
 
     ::base::TransformWithCovariance current_pose_with_cov;
     current_pose_with_cov.translation = this->pose_state.pos;
@@ -395,11 +395,11 @@ void Task::updateESAM()
     current_pose_with_cov.cov = cov_current_delta_pose; // At this time the covariance is just from the UKF prediction
     this->esam->insertPoseValue(frame_id, current_pose_with_cov);
 
-    //std::cout<<"********************************************\n";
-    //std::cout<<"[SAM] CURRENT POSITION:\n"<<current_pose_with_cov.translation<<"\n";
-    //std::cout<<"[SAM] CURRENT ORIENTATION ROLL: "<< base::getRoll(current_pose_with_cov.orientation)*R2D
-    //    <<" PITCH: "<< base::getPitch(current_pose_with_cov.orientation)*R2D<<" YAW: "<< base::getYaw(current_pose_with_cov.orientation)*R2D<<std::endl;
-    //std::cout<<"[SAM] CURRENT COVARIANCE:\n"<<current_pose_with_cov.cov<<"\n";
+    std::cout<<"********************************************\n";
+    std::cout<<"[SAM] CURRENT POSITION:\n"<<current_pose_with_cov.translation<<"\n";
+    std::cout<<"[SAM] CURRENT ORIENTATION ROLL: "<< base::getRoll(current_pose_with_cov.orientation)*R2D
+        <<" PITCH: "<< base::getPitch(current_pose_with_cov.orientation)*R2D<<" YAW: "<< base::getYaw(current_pose_with_cov.orientation)*R2D<<std::endl;
+    std::cout<<"[SAM] CURRENT COVARIANCE:\n"<<current_pose_with_cov.cov<<"\n";
 
     return;
 }
@@ -415,10 +415,10 @@ void Task::resetUKF(::base::Pose &current_delta_pose, ::base::Matrix6d &cov_curr
     cov_current_delta_pose = this->filter->sigma().block<6,6>(0,0);
 
     /** Update the pose state **/
-    this->pose_state.orient *= this->filter->mu().orient;// delta in orientation
     this->pose_state.pos += this->pose_state.orient * this->filter->mu().pos;// delta in position
     this->pose_state.velo = this->pose_state.orient * this->filter->mu().velo;// current linear velocity
     this->pose_state.angvelo = this->pose_state.orient * this->filter->mu().angvelo;// current angular velocity
+    this->pose_state.orient *= this->filter->mu().orient;// delta in orientation
 
     /** Reset covariance matrix **/
     UKF::cov P(UKF::cov::Zero());
@@ -469,8 +469,8 @@ bool Task::checkSegmentCov(const double &current_segment)
     const double error = Eigen::Vector3d(e_val.array().sqrt()).norm();
 
     //std::cout<<"[SAM] CURRENT DELTA COVARIANCE:\n"<<cov_segment_position<<"\n";
-    std::cout<<"[SAM] CURRENT NORM ERROR: "<<error<<"\n";
-    std::cout<<"[SAM] TARGET NORM ERROR: "<<_error_per_distance_traveled.value() * current_segment<<"\n";
+   // std::cout<<"[SAM] CURRENT NORM ERROR: "<<error<<"\n";
+   // std::cout<<"[SAM] TARGET NORM ERROR: "<<_error_per_distance_traveled.value() * current_segment<<"\n";
     if (error > _error_per_distance_traveled.value() * current_segment)
     {
         return true;
