@@ -156,7 +156,7 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
 
             /** Detect Landmarks **/
             std::cout<<"[SAM] DETECT LANDMARKS\n";
-            this->esam->detectLandmarks();
+            this->esam->detectLandmarks(this->delta_pose.time);
 
             /** Write graph into GraphViz **/
             this->esam->graphViz("esam_graph.dot");
