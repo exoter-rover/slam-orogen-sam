@@ -96,6 +96,12 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
         /** Set the delta_pose **/
         this->delta_pose = delta_pose_samples_sample;
 
+        /** Set the variable to compute the segments **/
+        this->start_distance_segment_time = delta_pose_samples_sample.time;
+        this->velocity_norm_cov = 0.00;
+        this->accumulated_segment = 0.00;
+        this->velocity_cov_counts = 0;
+
         #ifdef DEBUG_PRINTS
         //RTT::log(RTT::Warning)<<"[DONE]\n";
         #endif
@@ -133,22 +139,28 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
 
     /** Current delta segment displacement (previous - current pose) in last
      * pose frame **/
-    double current_segment = this->filter->mu().pos.norm();
+    double distance_segment = std::fabs(this->filter->mu().pos.norm() - this->accumulated_segment);
 
-//    std::cout<<"CURRENT SEGMENT: "<<current_segment;
+    this->velocity_norm_cov = std::max(this->velocity_norm_cov, this->delta_pose.cov_velocity.norm());
+    this->velocity_cov_counts++;
+
+    //std::cout<<"ACCUMULATED SEGMENT: "<<accumulated_segment<<"\n";
+    //std::cout<<"DISTANCE SEGMENT: "<<distance_segment<<"\n";
+    //std::cout<<"MAXIMUM NORM COVARIANCE: "<<this->velocity_norm_cov<<"\n";
 
     /** Check the distance traveled **/
-    if(current_segment > _distance_segment.value())
+    if(distance_segment > _distance_segment.value())
     {
-//        std::cout<<" IS BIGGER THAN "<<_distance_segment.value()<<"\n";
+        //std::cout<<" IS BIGGER THAN "<<_distance_segment.value()<<"\n";
 
         /** Only add a new node in case the covariance is bigger than the
          * percentage error defined in the task property **/
-        if (this->checkSegmentCov(current_segment))
+        if (this->checkSegmentVelocityCov(start_distance_segment_time,
+                    this->delta_pose.time, distance_segment))
         {
             /** Update ESAM **/
             this->updateESAM();
-            this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
+            //this->esam->printFactorGraph("\nFACTOR GRAPH!!!!\n");
 
             /** Compute Features Keypoints **/
             std::cout<<"[SAM] COMPUTE KEYPOINTS AND FEATURES\n";
@@ -165,8 +177,14 @@ void Task::delta_pose_samplesTransformerCallback(const base::Time &ts, const ::b
             this->esam->currentPointCloudtoPLY("point_cloud_", true);
 
             /** Update Information **/
-            this->updateInformation(current_segment);
+            this->updateInformation(accumulated_segment+distance_segment);
         }
+
+        /** Reset accumulated segment, velocity covariance and the time for the next iteration **/
+        this->accumulated_segment = this->filter->mu().pos.norm();
+        this->velocity_norm_cov = 0.00;
+        this->start_distance_segment_time = this->delta_pose.time;
+        this->velocity_cov_counts = 0;
     }
 
 //    std::cout<<"\n";
@@ -470,6 +488,25 @@ void Task::initESAM(base::TransformWithCovariance &tf_cov)
     this->esam->graphViz("esam_graph.dot");
 
     return;
+}
+
+bool Task::checkSegmentVelocityCov(const base::Time &start, const base::Time &end,
+                                const double &segment)
+{
+    const float segment_velo = segment / (end - start).toSeconds();
+    //this->velocity_norm_cov /= this->velocity_cov_counts;
+
+    //std::cout<<"DELTA TIME: "<<(end-start).toSeconds()<<" [SECONDS]\n";
+    //std::cout<<"SEGMENT VELOCITY: "<<segment_velo<<"\n";
+    //std::cout<<"NORM COVARIANCE: "<<this->velocity_norm_cov<<"\n";
+    //std::cout<<"TARGET NORM COVARIANCE: "<<(segment_velo * _error_per_distance_traveled.value())<<"\n";
+
+    if (this->velocity_norm_cov >= (segment_velo * _error_per_distance_traveled.value()))
+    {
+        return true;
+    }
+
+    return false;
 }
 
 bool Task::checkSegmentCov(const double &current_segment)

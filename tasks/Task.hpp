@@ -111,6 +111,15 @@ namespace sam {
         /** Envire Smoothing and Mapping **/
         boost::shared_ptr<envire::sam::ESAM> esam;
 
+        /** Norm of the covariance in segment **/
+        double velocity_norm_cov;
+
+        int velocity_cov_counts;
+
+        double accumulated_segment;
+
+        base::Time start_distance_segment_time;
+
         /**************************/
         /** Input port variables **/
         /**************************/
@@ -233,6 +242,10 @@ namespace sam {
         /**@brief Initialize the envire SAM
          */
         void initESAM(base::TransformWithCovariance &tf_cov);
+
+        /**@brief Check the velocity uncertainty over the last segment velocity
+         */
+        bool checkSegmentVelocityCov(const base::Time &start, const base::Time &end, const double &segment);
 
         /**@brief Check the uncertainty over the last segment
          */
