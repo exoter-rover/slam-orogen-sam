@@ -70,7 +70,7 @@ namespace sam {
     {
 	friend class TaskBase;
 
- public:
+    public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW //Structures having Eigen members
 
     protected:

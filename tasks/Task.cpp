@@ -496,12 +496,12 @@ bool Task::checkSegmentVelocityCov(const base::Time &start, const base::Time &en
     const float segment_velo = segment / (end - start).toSeconds();
     //this->velocity_norm_cov /= this->velocity_cov_counts;
 
-    //std::cout<<"DELTA TIME: "<<(end-start).toSeconds()<<" [SECONDS]\n";
-    //std::cout<<"SEGMENT VELOCITY: "<<segment_velo<<"\n";
-    //std::cout<<"NORM COVARIANCE: "<<this->velocity_norm_cov<<"\n";
-    //std::cout<<"TARGET NORM COVARIANCE: "<<(segment_velo * _error_per_distance_traveled.value())<<"\n";
+    std::cout<<"[SAM] DELTA TIME: "<<(end-start).toSeconds()<<" [SECONDS]\n";
+    std::cout<<"[SAM] SEGMENT VELOCITY: "<<segment_velo<<"\n";
+    std::cout<<"[SAM] NORM STD DEVIATION: "<<this->velocity_norm_cov<<"\n";
+    std::cout<<"[SAM] TARGET NORM COVARIANCE: "<<(segment_velo * _error_per_distance_traveled.value())<<"\n";
 
-    if (this->velocity_norm_cov >= (segment_velo * _error_per_distance_traveled.value()))
+    if (sqrt(this->velocity_norm_cov) >= (segment_velo * _error_per_distance_traveled.value()))
     {
         return true;
     }
