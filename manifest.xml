@@ -14,8 +14,10 @@
   <depend package="dummy-dependency-n-1" />
   <depend package="dummy-dependency-n" />
   -->
+  <depend package="drivers/orogen/transformer" />
   <depend package="slam/mtk" />
   <depend package="slam/gtsam" />
   <depend package="envire/envire_core" />
   <depend package="slam/envire_sam" />
 </package>
+
